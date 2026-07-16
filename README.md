@@ -20,6 +20,34 @@ to check them against, and this project doesn't pretend otherwise.
 *Author: Maria Sfondrini — Master in Finance, Peking University HSBC Business School;
 B.Sc. Computer System Engineering, Politecnico di Milano.*
 
+## Why this project exists
+
+Most public "DCF in Excel" projects are a spreadsheet and nothing else: no way to tell
+whether the market-observable inputs (peer multiples, beta) were reasonable on the day they
+were typed in, and no way to re-check them later without redoing the research from scratch.
+This project keeps the Excel model as the primary analytical deliverable — the forecast
+judgment belongs there, made by a person, not automated — but adds a small, real Python
+layer whose only job is to fetch live market data and independently re-derive the handful of
+inputs a live source can actually confirm or refute. It found two genuine issues doing that
+(see Live Validation below), which is the point: a validation layer that never disagrees
+with the model it's checking isn't doing anything.
+
+## Features
+
+- **Excel DCF model**: 5-year FCFF forecast, WACC built up from its components, dual
+  terminal value (Gordon growth and exit EV/EBITDA), a WACC × terminal-growth sensitivity
+  grid, and a football-field valuation summary.
+- **Trading comparables**: Diageo, Pernod Ricard, Rémy Cointreau, and Brown-Forman, with
+  peer-median and peer-range implied valuations.
+- **Live validation layer** (`src/campari_valuation/`): fetches current market data and
+  independently re-derives beta (regression against two benchmarks, with the same Blume
+  adjustment formula the Excel uses) and peer trading multiples (EV/EBITDA, EV/Sales, P/E,
+  P/B), then reports how they compare to the Excel's stated assumptions.
+- **Explicit data-quality handling**: detects and flags currency-unit inconsistencies in
+  live vendor data (see the Diageo finding below) instead of silently trusting or "fixing"
+  them with an unverified correction.
+- Full pytest suite (unit + mocked-API + integration), ruff linting, GitHub Actions CI.
+
 ## Files
 
 - `Campari_DCF_Model.xlsx` — the model. Blue cells = inputs, black = formulas.
@@ -27,7 +55,9 @@ B.Sc. Computer System Engineering, Politecnico di Milano.*
 - `RESEARCH_NOTE.md` — method, results, view, honest limitations, and the live-validation findings.
 - `src/campari_valuation/` — the live-data validation layer (see below).
 
-## Headline results (market data as of early July 2026)
+## Results
+
+Headline DCF and comps outputs, market data as of early July 2026:
 
 | Method | Implied price | vs €5.49 |
 |---|---|---|
@@ -94,7 +124,9 @@ Also saves `results/peer_multiples_validation.png` (Excel vs. live EV/EBITDA by 
 `results/validation_metadata.json` (every live figure plus package versions, for
 reproducibility).
 
-### Installation and usage
+![Peer EV/EBITDA: Excel model vs. live re-check](docs/peer_multiples_validation.png)
+
+## Installation
 
 ```bash
 git clone https://github.com/sfondrinimaria02-del/campari-valuation.git
@@ -103,11 +135,15 @@ python -m venv .venv
 source .venv/Scripts/activate      # Windows (Git Bash); use .venv\Scripts\activate.bat for cmd.exe
 # source .venv/bin/activate        # macOS/Linux
 pip install -e ".[dev]"
+```
 
+## Usage
+
+```bash
 python -m campari_valuation.cli
 ```
 
-### Testing
+## Testing
 
 ```bash
 pytest --cov=campari_valuation --cov-report=term-missing   # unit tests, yfinance mocked
@@ -130,6 +166,16 @@ market data and peer multiples: stockanalysis.com (July 2026). Risk-free: 10Y Bu
 `RESEARCH_NOTE.md`), so it is not part of the live validation. The Python layer's own live
 figures come directly from Yahoo Finance at run time. All public information; academic
 project, not investment advice.
+
+## Roadmap
+
+- A live cross-check for the risk-free rate: no free API currently offers a clean 10Y Bund
+  yield series (see `RESEARCH_NOTE.md`), so this input stays Excel-only for now.
+- Peer-average unlevered ("asset") beta as a cross-check to the regression-based equity beta.
+- Sum-of-the-parts / brand-level analysis (Aperol, Campari, Espolòn, Wild Turkey, Courvoisier)
+  — the current model values the group as a single cash-flow stream.
+- Extend the live validation layer to a second company, to confirm the currency-unit and
+  data-quality handling generalizes beyond this specific peer set.
 
 ## Disclaimer
 
