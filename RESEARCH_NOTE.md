@@ -1,7 +1,7 @@
 # Davide Campari-Milano N.V. (BIT: CPR) — Valuation Note
 
 *Maria Sfondrini — July 2026 · Academic portfolio project, not investment advice*
-*Companion file: Campari_DCF_Model_Maria_Sfondrini.xlsx (all figures reproduce from the model)*
+*Companion file: Campari_DCF_Model.xlsx (all figures reproduce from the model)*
 
 ## 1. Company and setup
 
@@ -62,3 +62,38 @@ would be a useful cross-check. Comps are point-in-time and the peer set trades o
 earnings (Pernod at 9.4x vs its ~13x history), which mechanically deflates the median. No
 sum-of-the-parts or brand-level analysis was attempted. All market data as of early July 2026
 and should be refreshed before any use.
+
+## 6. Live validation findings
+
+The `campari_valuation` Python package (`src/campari_valuation/`) independently re-derives the
+two model inputs a live market data source can actually confirm or refute: beta and peer
+trading multiples. Two findings from that exercise are worth stating explicitly, because they
+are genuine discoveries about data and methodology, not restatements of the Excel's own numbers.
+
+**Beta depends heavily on both benchmark choice and lookback window - neither alone tells the
+full story.** At a fixed 2-year weekly-return window, four candidate European indices produced
+raw betas from 0.49 (FTSE MIB, Campari's home listing) to 0.85 (STOXX Europe 600, a broad
+pan-European benchmark) - a >70% range from benchmark choice alone. Varying the lookback from
+1 to 5 years within each benchmark separately shows window length matters too, and differently
+for each: FTSE MIB rises from 0.32 (1Y) to 0.49 (2Y) to 0.60 (5Y), while STOXX 600 is higher
+and flatter across the same windows (0.64 / 0.84 / 0.85). The Excel's vendor-sourced raw beta
+of 0.43 sits closest to the home-market benchmark at short-to-medium windows - consistent with
+(though not proof of) the vendor having used FTSE MIB rather than a pan-European index.
+Practically: **stating a stock's beta without stating the benchmark and window it was
+regressed over is an incomplete claim**, and this is easy to miss when consuming a single
+vendor-reported number rather than re-deriving it.
+
+**A real data-quality issue, not a bug, explains most of the Diageo comp's divergence.** Live
+EV/EBITDA for three of the four peers (Pernod Ricard, Rémy Cointreau, Brown-Forman) lands
+within roughly 4% of the Excel's Comps tab. Diageo is the outlier (9.4x live vs. 11.25x in the
+Excel). Investigating why surfaced that Yahoo Finance's quote-summary endpoint returns Diageo's
+share price in pence (currency code `GBp`) while separately labeling its reported financials
+`financialCurrency: USD` - yet its `marketCap` and `enterpriseValue` fields are nonetheless
+GBP-scale, not USD-scale. That is an internally inconsistent set of fields from a single API
+response for a single security, not a currency conversion this package could safely apply
+without risking making the number worse. The package detects this
+(`CompanySnapshot.currency_mismatch`) and flags the affected ticker in its output rather than
+silently trusting the inconsistent data or guessing at a correction. This is the kind of
+data-quality trap that is invisible unless you specifically cross-check a live provider's
+internal field consistency -
+exactly the discipline this project's live-validation layer exists to apply.
